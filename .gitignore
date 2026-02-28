@@ -1,0 +1,5 @@
+.vs
+.idea
+target/
+./database/postgres_data/
+*.env
