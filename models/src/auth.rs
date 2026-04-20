@@ -5,3 +5,8 @@ pub struct LoginPayload {
     pub email: String,
     pub password: String,
 }
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct LoginResponse {
+    pub token: String,
+}

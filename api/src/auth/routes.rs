@@ -2,13 +2,13 @@ use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use serde_json::json;
 use sqlx::types::Uuid;
 
-use models::auth::LoginPayload;
 use crate::auth::get_token_from_header;
 use crate::auth::logic::create_token;
 use crate::auth::queries::{
     add_token_to_db, check_credentials, delete_token, get_tokendata_from_db,
 };
 use crate::error::ApiError;
+use models::auth::{LoginPayload, LoginResponse};
 
 // auth routes
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
@@ -32,7 +32,7 @@ async fn login(payload: web::Json<LoginPayload>) -> Result<impl Responder, ApiEr
     let experation_time = chrono::Utc::now() + chrono::Duration::days(1);
 
     return match add_token_to_db(&token, &user_id, &experation_time).await {
-        Ok(_) => Ok(HttpResponse::Ok().json(json!({ "token": token }))),
+        Ok(_) => Ok(HttpResponse::Ok().json(LoginResponse { token })),
         Err(e) => Err(e),
     };
 }

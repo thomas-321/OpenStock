@@ -23,7 +23,7 @@ pub async fn check_token(
 
     match get_user_role(token.user_id).await {
         Ok(role) => req.extensions_mut().insert(role),
-        Err(e) => return Err(ApiError::GeneralServerError.into()),
+        Err(_) => return Err(ApiError::GeneralServerError.into()),
     };
 
     let res = next.call(req).await?;

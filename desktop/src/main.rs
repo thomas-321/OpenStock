@@ -1,13 +1,19 @@
-use iced::widget::Button;
 use iced::widget::{button, text};
-use iced::{Element, Theme};
+use iced::widget::{center, container, Button};
+use iced::{Element, Task, Theme};
+use models::auth::LoginResponse;
 
-use crate::pages::home::HomePageMessage;
-use crate::pages::login::{LoginPage, LoginPageMessage};
-use crate::pages::Page;
+use crate::error::AppError;
+use crate::state::ApiClient;
+use crate::windows::home::HomeWindowMessage;
+use crate::windows::login::LoginWindowMessage;
+use crate::windows::window::{IdGenerator, Pane, Tab, TabId, Window};
 
 mod error;
-mod pages;
+mod services;
+mod state;
+mod widgets;
+mod windows;
 
 fn main() -> iced::Result {
     iced::application(Openstock::default, Openstock::update, Openstock::view)
@@ -18,17 +24,32 @@ fn main() -> iced::Result {
 
 #[derive(Clone)]
 enum Message {
-    Login(LoginPageMessage),
-    Home(HomePageMessage),
+    Tab(TabId, WindowMessage),
+    GlobalStateMessage(StateMessage),
+}
+
+#[derive(Clone)]
+enum StateMessage {
+    LoginFinshed(Result<LoginResponse, AppError>),
+}
+
+#[derive(Clone)]
+enum WindowMessage {
+    Login(LoginWindowMessage),
+    Home(HomeWindowMessage),
+}
+
+#[derive(Clone)]
+pub struct Context {
+    api: ApiClient,
 }
 
 pub struct Openstock {
-    Page: Box<dyn Page>,
+    panes: Vec<Pane>,
+    tabs: Vec<Tab>,
     theme: Theme,
-}
-
-fn padded_button<Message: Clone>(label: &str) -> Button<'_, Message> {
-    button(text(label)).padding([12, 24])
+    id_generator: IdGenerator,
+    context: Context,
 }
 
 impl Openstock {
@@ -36,22 +57,64 @@ impl Openstock {
         "Openstock".to_string()
     }
 
-    fn update(&mut self, message: Message) {
-        if let Some(new_Page) = self.Page.update(message) {
-            self.Page = new_Page;
+    fn update(&mut self, message: Message) -> Task<Message> {
+        match message {
+            Message::Tab(tab_id, w_message) => {
+                match self.tabs.iter_mut().find(|tab| tab.tab_id == tab_id) {
+                    Some(tab) => tab.window.update(w_message, self.context.clone()),
+                    None => {
+                        println!("Received message from destroyed window");
+                        Task::none()
+                    }
+                }
+            }
+            Message::GlobalStateMessage(smessage) => self.handle_state_message(smessage),
         }
     }
 
     fn view(&self) -> Element<'_, Message> {
-        self.Page.view()
+        match self.tabs.first() {
+            Some(tab) => tab.window.view(tab.tab_id),
+            None => center(container(text("Error loading page"))).into(),
+        }
+    }
+
+    fn handle_state_message(&mut self, message: StateMessage) -> Task<Message> {
+        match message {
+            StateMessage::LoginFinshed(result) => {
+                match result {
+                    Ok(value) => println!("Ok: {}", value.token),
+                    Err(e) => println!("Error: {}", e),
+                }
+                Task::none()
+            }
+        }
     }
 }
 
 impl Default for Openstock {
     fn default() -> Self {
+        let mut id_generator = IdGenerator::default();
+
+        let pane = windows::window::Pane {
+            pane_id: id_generator.get_new_pane_id(),
+            active_tab_id: None,
+        };
+        let default_window = windows::LoginWindow::default();
+        let tab = windows::window::Tab::new(
+            id_generator.get_new_pane_id(),
+            id_generator.get_new_tab_id(),
+            default_window,
+        );
+
         Self {
-            Page: Box::new(LoginPage::default()),
             theme: Theme::Dark,
+            id_generator: IdGenerator::default(),
+            panes: vec![pane],
+            tabs: vec![tab],
+            context: Context {
+                api: ApiClient::new("http://localhost:8080".to_string()),
+            },
         }
     }
 }
