@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: openstock_db
+    restart: unless-stopped
+
+    env_file:
+      - ../.env
+
+    ports:
+      - "5440:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./tables.sql:/docker-entrypoint-initdb.d/01-tables.sql:ro
+      - ./data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+      # Uncomment if you have init scripts
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
