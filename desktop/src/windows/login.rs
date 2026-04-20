@@ -31,7 +31,7 @@ pub enum Field {
 }
 
 impl Window for LoginWindow {
-    fn update(&mut self, message: WindowMessage, context: Context) -> Task<Message> {
+    fn update(&mut self, message: WindowMessage, tab_id: TabId, context: Context) -> Task<Message> {
         let WindowMessage::Login(msg) = message else {
             return Task::none();
         };

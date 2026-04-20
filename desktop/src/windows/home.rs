@@ -1,3 +1,4 @@
+use iced::widget::{center, container, text};
 use iced::Task;
 
 use crate::windows::window::{TabId, Window};
@@ -10,12 +11,12 @@ pub enum HomeWindowMessage {}
 pub struct HomeWindow {}
 
 impl Window for HomeWindow {
-    fn update(&mut self, _message: WindowMessage, _app: Context) -> Task<Message> {
+    fn update(&mut self, _message: WindowMessage, _tab_id: TabId, _app: Context) -> Task<Message> {
         todo!()
     }
 
     fn view(&self, _tab_id: TabId) -> iced::Element<'_, Message> {
-        todo!()
+        center(container(text("Home Page"))).into()
     }
     fn get_title(&self) -> &str {
         "Home page"

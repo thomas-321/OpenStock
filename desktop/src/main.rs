@@ -1,5 +1,5 @@
-use iced::widget::{button, text};
-use iced::widget::{center, container, Button};
+use iced::widget::text;
+use iced::widget::{center, container};
 use iced::{Element, Task, Theme};
 use models::auth::LoginResponse;
 
@@ -7,7 +7,7 @@ use crate::error::AppError;
 use crate::state::ApiClient;
 use crate::windows::home::HomeWindowMessage;
 use crate::windows::login::LoginWindowMessage;
-use crate::windows::window::{IdGenerator, Pane, Tab, TabId, Window};
+use crate::windows::window::{IdGenerator, Pane, PaneId, Tab, TabId};
 
 mod error;
 mod services;
@@ -31,6 +31,12 @@ enum Message {
 #[derive(Clone)]
 enum StateMessage {
     LoginFinshed(Result<LoginResponse, AppError>),
+    CreateTab(CreateTab, TabId),
+}
+
+#[derive(Clone)]
+enum CreateTab {
+    HomeWindow,
 }
 
 #[derive(Clone)]
@@ -56,12 +62,11 @@ impl Openstock {
     fn title(&self) -> String {
         "Openstock".to_string()
     }
-
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Tab(tab_id, w_message) => {
                 match self.tabs.iter_mut().find(|tab| tab.tab_id == tab_id) {
-                    Some(tab) => tab.window.update(w_message, self.context.clone()),
+                    Some(tab) => tab.window.update(w_message, tab_id, self.context.clone()),
                     None => {
                         println!("Received message from destroyed window");
                         Task::none()
@@ -79,6 +84,28 @@ impl Openstock {
         }
     }
 
+    fn get_pane_from_tab_id(&mut self, tab_id: TabId) -> PaneId {
+        let o_pane_id = self
+            .tabs
+            .iter()
+            .find(|&tab| tab.tab_id == tab_id)
+            .map(|t| t.pane_id.clone());
+
+        match o_pane_id {
+            Some(pane_id) => pane_id,
+            None => {
+                if self.panes.is_empty() {
+                    let new_pane_id = self.id_generator.get_new_pane_id();
+                    self.panes.push(Pane {
+                        pane_id: new_pane_id,
+                        active_tab_id: None,
+                    })
+                }
+                self.panes.first().unwrap().pane_id.clone()
+            }
+        }
+    }
+
     fn handle_state_message(&mut self, message: StateMessage) -> Task<Message> {
         match message {
             StateMessage::LoginFinshed(result) => {
@@ -87,6 +114,12 @@ impl Openstock {
                     Err(e) => println!("Error: {}", e),
                 }
                 Task::none()
+            }
+            StateMessage::CreateTab(tab, source_tab_id) => {
+                let pane_id = self.get_pane_from_tab_id(source_tab_id);
+                match tab {
+                    CreateTab::HomeWindow => todo!(),
+                }
             }
         }
     }

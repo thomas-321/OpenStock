@@ -3,7 +3,7 @@ use crate::{Message, WindowMessage};
 use iced::Task;
 
 pub trait Window {
-    fn update(&mut self, message: WindowMessage, app: Context) -> Task<Message>;
+    fn update(&mut self, message: WindowMessage, tab_id: TabId, app: Context) -> Task<Message>;
     //) -> (Option<Box<dyn Window>>, Task<WindowMessage>);
     fn view(&self, tab_id: TabId) -> iced::Element<'_, Message>;
     fn get_title(&self) -> &str;
@@ -37,7 +37,7 @@ pub struct TabId {
 }
 
 /// PaneId indicates which pane a window is a part of
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct PaneId {
     pub id: u32,
 }
