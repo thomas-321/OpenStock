@@ -17,6 +17,8 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(check);
 }
 
+// test
+
 /// receives a username and password
 /// returns a token to send requests to this api if both username and password match
 /// if username and password do not match an ApiError is returned
