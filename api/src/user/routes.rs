@@ -1,7 +1,6 @@
 use actix_web::{
-    delete, get, patch, post,
+    HttpResponse, Responder, delete, get, patch, post,
     web::{self, ReqData},
-    HttpResponse, Responder,
 };
 use serde_json::json;
 
@@ -13,6 +12,7 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(get_self);
     cfg.service(change);
     cfg.service(delete);
+    cfg.service(get_role_self);
 }
 
 #[post("")]
@@ -52,4 +52,13 @@ async fn change() -> impl Responder {
 async fn delete() -> impl Responder {
     HttpResponse::NotImplemented()
         .json(json!({"status": "failed", "message": "Api 'DELETE /user' not implemented"}))
+}
+
+/// Used for a client to get its own user data
+/// The auth token used in in the request will be used to match
+/// against.
+/// returns User if own user data is requested.
+#[get("/role/self")]
+async fn get_role_self(auth: ReqData<AuthContext>) -> Result<impl Responder, ApiError> {
+    Ok(HttpResponse::Ok().json(&auth.role))
 }

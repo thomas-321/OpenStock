@@ -13,6 +13,15 @@ pub enum AppError {
     #[error("Error reading server response")]
     JsonParseError,
 
+    #[error("Error reading server response")]
+    SuccesWithNoContent,
+
+    #[error("You do not have access rights to the requested function")]
+    Unauthorized,
+
+    #[error("Login expired.")]
+    LoginExpired,
+
     #[error("Invalid login credentials")]
     InvalidLogin,
 

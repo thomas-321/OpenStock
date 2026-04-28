@@ -1,11 +1,19 @@
+use std::sync::Arc;
+
+use crate::util::ApiClient;
 use crate::Context;
 use crate::{Message, WindowMessage};
 use iced::Task;
+use uuid::timestamp::context;
 
 pub trait Window {
-    fn update(&mut self, message: WindowMessage, tab_id: TabId, app: Context) -> Task<Message>;
-    //) -> (Option<Box<dyn Window>>, Task<WindowMessage>);
-    fn view(&self, tab_id: TabId) -> iced::Element<'_, Message>;
+    fn update(
+        &mut self,
+        message: WindowMessage,
+        tab_id: TabId,
+        app: Arc<ApiClient>,
+    ) -> Task<Message>;
+    fn view(&self, tab_id: TabId, context: &Context) -> iced::Element<'_, Message>;
     fn get_title(&self) -> &str;
 }
 
