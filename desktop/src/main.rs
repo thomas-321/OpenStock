@@ -1,5 +1,5 @@
 use iced::widget::{center, container, text};
-use iced::{Element, Task, Theme};
+use iced::{Element, Task, Theme, color};
 use std::sync::Arc;
 
 use models::auth::LoginResponse;
@@ -21,6 +21,7 @@ mod windows;
 fn main() -> iced::Result {
     iced::application(Openstock::default, Openstock::update, Openstock::view)
         .title(Openstock::title)
+        .theme(Openstock::theme)
         .centered()
         .run()
 }
@@ -55,12 +56,12 @@ pub struct Context {
     api: Arc<ApiClient>,
     user: Option<User>,
     role: Option<Role>,
+    theme: Theme,
 }
 
 pub struct Openstock {
     panes: Vec<Pane>,
     tabs: Vec<Tab>,
-    theme: Theme,
     id_generator: IdGenerator,
     context: Arc<Context>,
 }
@@ -91,9 +92,16 @@ impl Openstock {
     fn view(&self) -> Element<'_, Message> {
         let context: &Context = self.context.as_ref();
         match self.tabs.first() {
-            Some(tab) => tab.window.view(tab.tab_id, context),
+            Some(tab) => tab
+                .window
+                .view(tab.tab_id, context)
+                .explain(color!(0x0000ff)),
             None => center(container(text("Error loading page"))).into(),
         }
+    }
+
+    fn theme(&self) -> Option<Theme> {
+        Some(self.context.theme.clone())
     }
 
     fn get_pane_from_tab_id(&mut self, tab_id: TabId) -> PaneId {
@@ -125,7 +133,13 @@ impl Openstock {
                     Ok(value) => {
                         self.context.api.set_token(value.token);
                     }
-                    Err(e) => println!("Error: {}", e),
+                    Err(e) => {
+                        println!("Error: {}", e);
+                        return Task::done(Message::Tab(
+                            tab_id,
+                            WindowMessage::Login(LoginWindowMessage::LoginFailed(e)),
+                        ));
+                    }
                 }
 
                 let api = self.context.api.clone();
@@ -218,7 +232,6 @@ impl Default for Openstock {
         );
 
         Self {
-            theme: Theme::Dark,
             id_generator: IdGenerator::default(),
             panes: vec![pane],
             tabs: vec![tab],
@@ -226,6 +239,7 @@ impl Default for Openstock {
                 user: None,
                 role: None,
                 api: ApiClient::new("http://localhost:8080".to_string()).into(),
+                theme: Theme::Dark,
             }
             .into(),
         }

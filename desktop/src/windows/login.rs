@@ -16,6 +16,7 @@ use crate::{Context, Message, StateMessage, WindowMessage};
 pub enum LoginWindowMessage {
     LoginPressed,
     RegisterPressed,
+    DevLoginPressed,
     TextFieldChanged(Field, String),
     LoginFailed(AppError),
 }
@@ -25,6 +26,7 @@ pub struct LoginWindow {
     window_title: String,
     email: Option<String>,
     password: Option<String>,
+    error: Option<AppError>,
 }
 
 #[derive(Clone)]
@@ -54,6 +56,16 @@ impl Window for LoginWindow {
                 }
                 Task::none()
             }
+            LoginWindowMessage::DevLoginPressed => Task::perform(
+                auth_service::login(
+                    api,
+                    Some("jan.vandermeer@example.com".to_string()),
+                    Some("pass001".to_string()),
+                ),
+                move |result| {
+                    Message::GlobalStateMessage(tab_id, StateMessage::LoginFinshed(result))
+                },
+            ),
             LoginWindowMessage::LoginPressed => {
                 println!("login pressed");
 
@@ -71,6 +83,13 @@ impl Window for LoginWindow {
             }
             LoginWindowMessage::LoginFailed(error) => {
                 println!("login failed with error: {}", error);
+                match error {
+                    AppError::InvalidLogin => {
+                        self.email = None;
+                        self.password = None;
+                    }
+                    _ => self.error = Some(error),
+                }
                 Task::none()
             }
         }
@@ -79,8 +98,8 @@ impl Window for LoginWindow {
     fn view(&self, tab_id: TabId, _context: &Context) -> iced::Element<'_, Message> {
         let container = container(
             column![
-                text("Username:").size(10),
-                text_input("username", self.email.as_deref().unwrap_or(""))
+                text("Email:").size(10),
+                text_input("email", self.email.as_deref().unwrap_or(""))
                     .padding(10)
                     .on_input(move |s| {
                         create_message(
@@ -102,12 +121,19 @@ impl Window for LoginWindow {
                     }),
                 Space::new().height(20),
                 button("Login")
+                    .style(button::primary)
                     .width(Length::Fill)
                     .on_press(create_message(tab_id, LoginWindowMessage::LoginPressed)),
+                Space::new().height(10),
+                button("Dev quick login")
+                    .style(button::primary)
+                    .width(Length::Fill)
+                    .on_press(create_message(tab_id, LoginWindowMessage::DevLoginPressed)),
                 Space::new().height(40),
                 text("Click here to register:").size(10),
                 Space::new().height(5),
                 button("Register") // TODO: Change this to a hyprlink instead of a button
+                    .style(button::secondary)
                     .width(Length::Fill)
                     .on_press(create_message(tab_id, LoginWindowMessage::RegisterPressed)),
             ]
@@ -117,13 +143,16 @@ impl Window for LoginWindow {
         center(container).into()
     }
 
+    /// The login window does not have a sidebar
+    fn get_sidebar(&self) -> Option<iced::Element<'_, Message>> {
+        None
+    }
+
     fn get_title(&self) -> &str {
         "Login page"
     }
 }
 
-//impl LoginWindow {
 fn create_message(tab_id: TabId, message: LoginWindowMessage) -> Message {
     Message::Tab(tab_id, WindowMessage::Login(message))
 }
-//}

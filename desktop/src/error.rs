@@ -4,9 +4,6 @@ pub enum AppError {
     #[error("Could not connect to the api.")]
     ApiUnavailable,
 
-    #[error("Login failed, invalid credentials.")]
-    CredentialIncorrect,
-
     #[error("Error contacting server")]
     ApiClientError,
 

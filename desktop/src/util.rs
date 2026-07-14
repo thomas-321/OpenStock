@@ -1,6 +1,6 @@
 use core::time;
 use reqwest::{Client, RequestBuilder, StatusCode};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 use std::sync::{Arc, RwLock};
 
 use crate::error::AppError;
@@ -55,9 +55,9 @@ impl ApiClient {
     }
 
     /// sends an api request using the provided url
-    /// if there is a token present its validity will be checked before hand
+    /// if there is a token present its validity will be checked beforehand
     ///
-    /// returns `Ok(Option<T>)` if the request was succesful
+    /// returns `Ok(T)` if the request was succesful
     /// else returns `Err(AppError)`
     pub async fn send_get_request<T: DeserializeOwned>(
         &self,
@@ -75,8 +75,46 @@ impl ApiClient {
 
         match result {
             Ok(response) => {
-                if response.status() != StatusCode::OK {
-                    todo!("Handle different errorcodes like unauthorized");
+                if response.status() == StatusCode::UNAUTHORIZED {
+                    return Err(AppError::Unauthorized);
+                }
+                //todo!("Update last succeful request time");
+                response.json::<T>().await.or(Err(AppError::JsonParseError))
+            }
+            Err(e) => {
+                eprintln!("Error sending get request to server:/n {}", e);
+                Err(AppError::ApiClientError)
+            }
+        }
+    }
+    /// sends an api request using the provided url
+    /// if there is a token present its validity will be checked beforehand
+    ///
+    /// returns `Ok(T)` if the request was succesful
+    /// else returns `Err(AppError)`
+    pub async fn send_post_request_with_result<T: DeserializeOwned, I: Serialize>(
+        &self,
+        url_path: &str,
+        data: I,
+    ) -> Result<T, AppError> {
+        if !self.is_token_present() || !self.is_token_valid() {
+            self.remove_token();
+            Err(AppError::LoginExpired)?;
+        }
+
+        let result = self
+            .auth_request(
+                self.client
+                    .post(format!("{}{}", self.base_url, url_path))
+                    .json(&data),
+            )
+            .send()
+            .await;
+
+        match result {
+            Ok(response) => {
+                if response.status() == StatusCode::UNAUTHORIZED {
+                    return Err(AppError::Unauthorized);
                 }
                 //todo!("Update last succeful request time");
                 response.json::<T>().await.or(Err(AppError::JsonParseError))

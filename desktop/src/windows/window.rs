@@ -15,6 +15,7 @@ pub trait Window {
     ) -> Task<Message>;
     fn view(&self, tab_id: TabId, context: &Context) -> iced::Element<'_, Message>;
     fn get_title(&self) -> &str;
+    fn get_sidebar(&self) -> Option<iced::Element<'_, Message>>;
 }
 
 #[derive(Default)]
