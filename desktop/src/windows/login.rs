@@ -144,7 +144,7 @@ impl Window for LoginWindow {
     }
 
     /// The login window does not have a sidebar
-    fn get_sidebar(&self) -> Option<iced::Element<'_, Message>> {
+    fn get_sidebar(&self, _context: &Context) -> Option<iced::Element<'_, Message>> {
         None
     }
 

@@ -15,7 +15,7 @@ pub trait Window {
     ) -> Task<Message>;
     fn view(&self, tab_id: TabId, context: &Context) -> iced::Element<'_, Message>;
     fn get_title(&self) -> &str;
-    fn get_sidebar(&self) -> Option<iced::Element<'_, Message>>;
+    fn get_sidebar(&self, context: &Context) -> Option<iced::Element<'_, Message>>;
 }
 
 #[derive(Default)]
@@ -40,13 +40,13 @@ impl IdGenerator {
 }
 
 /// TabId indicates the id of one window tab
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TabId {
     pub id: u32,
 }
 
 /// PaneId indicates which pane a window is a part of
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PaneId {
     pub id: u32,
 }
@@ -73,4 +73,13 @@ impl Tab {
 pub struct Pane {
     pub pane_id: PaneId,
     pub active_tab_id: Option<TabId>,
+}
+
+impl Pane {
+    pub fn is_tab_in_foreground(&self, tab_id: TabId) -> bool {
+        match self.active_tab_id {
+            Some(id) => id == tab_id,
+            None => false,
+        }
+    }
 }
