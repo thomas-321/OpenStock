@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use iced::widget::Space;
 use iced::widget::{button, center, column, container, text, text_input};
 use iced::Length;
@@ -6,6 +8,7 @@ use models::auth::LoginResponse;
 
 use crate::error::AppError;
 use crate::services::auth_service;
+use crate::util::ApiClient;
 use crate::windows::window::{TabId, Window};
 use crate::{Context, Message, StateMessage, WindowMessage};
 
@@ -13,8 +16,9 @@ use crate::{Context, Message, StateMessage, WindowMessage};
 pub enum LoginWindowMessage {
     LoginPressed,
     RegisterPressed,
+    DevLoginPressed,
     TextFieldChanged(Field, String),
-    LoginFinished(Result<LoginResponse, AppError>),
+    LoginFailed(AppError),
 }
 
 #[derive(Default)]
@@ -22,6 +26,7 @@ pub struct LoginWindow {
     window_title: String,
     email: Option<String>,
     password: Option<String>,
+    error: Option<AppError>,
 }
 
 #[derive(Clone)]
@@ -31,7 +36,12 @@ pub enum Field {
 }
 
 impl Window for LoginWindow {
-    fn update(&mut self, message: WindowMessage, context: Context) -> Task<Message> {
+    fn update(
+        &mut self,
+        message: WindowMessage,
+        tab_id: TabId,
+        api: Arc<ApiClient>,
+    ) -> Task<Message> {
         let WindowMessage::Login(msg) = message else {
             return Task::none();
         };
@@ -46,39 +56,54 @@ impl Window for LoginWindow {
                 }
                 Task::none()
             }
+            LoginWindowMessage::DevLoginPressed => Task::perform(
+                auth_service::login(
+                    api,
+                    Some("jan.vandermeer@example.com".to_string()),
+                    Some("pass001".to_string()),
+                ),
+                move |result| {
+                    Message::GlobalStateMessage(tab_id, StateMessage::LoginFinshed(result))
+                },
+            ),
             LoginWindowMessage::LoginPressed => {
                 println!("login pressed");
 
                 let email = self.email.clone();
                 let password = self.password.clone();
-                let api = context.api.clone();
+                let api = api.clone();
 
-                //Task::none(),
-                Task::perform(auth_service::login(api, email, password), |result| {
-                    Message::GlobalStateMessage(StateMessage::LoginFinshed(result))
+                Task::perform(auth_service::login(api, email, password), move |result| {
+                    Message::GlobalStateMessage(tab_id, StateMessage::LoginFinshed(result))
                 })
             }
             LoginWindowMessage::RegisterPressed => {
                 println!("register pressed");
                 Task::none()
             }
-            LoginWindowMessage::LoginFinished(result) => {
-                println!("login finshed");
+            LoginWindowMessage::LoginFailed(error) => {
+                println!("login failed with error: {}", error);
+                match error {
+                    AppError::InvalidLogin => {
+                        self.email = None;
+                        self.password = None;
+                    }
+                    _ => self.error = Some(error),
+                }
                 Task::none()
             }
         }
     }
 
-    fn view(&self, tab_id: TabId) -> iced::Element<'_, Message> {
-        let tab_id = tab_id.clone();
+    fn view(&self, tab_id: TabId, _context: &Context) -> iced::Element<'_, Message> {
         let container = container(
             column![
-                text("Username:").size(10),
-                text_input("username", self.email.as_deref().unwrap_or(""))
+                text("Email:").size(10),
+                text_input("email", self.email.as_deref().unwrap_or(""))
                     .padding(10)
                     .on_input(move |s| {
                         create_message(
-                            tab_id.clone(),
+                            tab_id,
                             LoginWindowMessage::TextFieldChanged(Field::Email, s),
                         )
                     }),
@@ -90,24 +115,27 @@ impl Window for LoginWindow {
                     .padding(10)
                     .on_input(move |s| {
                         create_message(
-                            tab_id.clone(),
+                            tab_id,
                             LoginWindowMessage::TextFieldChanged(Field::Password, s),
                         )
                     }),
                 Space::new().height(20),
-                button("Login").width(Length::Fill).on_press(create_message(
-                    tab_id.clone(),
-                    LoginWindowMessage::LoginPressed
-                )),
+                button("Login")
+                    .style(button::primary)
+                    .width(Length::Fill)
+                    .on_press(create_message(tab_id, LoginWindowMessage::LoginPressed)),
+                Space::new().height(10),
+                button("Dev quick login")
+                    .style(button::primary)
+                    .width(Length::Fill)
+                    .on_press(create_message(tab_id, LoginWindowMessage::DevLoginPressed)),
                 Space::new().height(40),
                 text("Click here to register:").size(10),
                 Space::new().height(5),
-                button("Register") // Todo: Change this to a hyprlink instead of a button
+                button("Register") // TODO: Change this to a hyprlink instead of a button
+                    .style(button::secondary)
                     .width(Length::Fill)
-                    .on_press(create_message(
-                        tab_id.clone(),
-                        LoginWindowMessage::RegisterPressed
-                    )),
+                    .on_press(create_message(tab_id, LoginWindowMessage::RegisterPressed)),
             ]
             .width(500),
         );
@@ -115,13 +143,16 @@ impl Window for LoginWindow {
         center(container).into()
     }
 
+    /// The login window does not have a sidebar
+    fn get_sidebar(&self, _context: &Context) -> Option<iced::Element<'_, Message>> {
+        None
+    }
+
     fn get_title(&self) -> &str {
-        "Login page"
+        "Login"
     }
 }
 
-//impl LoginWindow {
 fn create_message(tab_id: TabId, message: LoginWindowMessage) -> Message {
     Message::Tab(tab_id, WindowMessage::Login(message))
 }
-//}

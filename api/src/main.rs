@@ -2,7 +2,7 @@
 #![deny(clippy::expect_used)]
 
 use actix_web::middleware::from_fn;
-use actix_web::{App, HttpServer, middleware::Logger, web};
+use actix_web::{middleware::Logger, web, App, HttpServer};
 use std::env;
 
 use database::init_pool;
@@ -20,7 +20,7 @@ async fn main() -> std::io::Result<()> {
     dotenv::from_filename(".env").ok();
 
     #[allow(clippy::expect_used)] // db connection error can not be gracefully handled
-    let database_url = env::var("DATABASE_URL_POSTGRES").expect("DATABASE_URL must be set");
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     #[allow(clippy::expect_used)] // db connection error can not be gracefully handled
     init_pool(&database_url)
@@ -49,4 +49,3 @@ async fn main() -> std::io::Result<()> {
     .run()
     .await
 }
-

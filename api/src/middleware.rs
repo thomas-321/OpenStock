@@ -3,6 +3,8 @@ use actix_web::dev::{ServiceRequest, ServiceResponse};
 use actix_web::middleware::Next;
 use actix_web::{Error, HttpMessage};
 
+use crate::auth;
+
 use super::auth::get_token_from_header;
 use super::auth::get_tokendata_from_db;
 use super::error::ApiError;
@@ -21,16 +23,18 @@ pub async fn check_token(
         return Err(ApiError::InvalidToken.into());
     }
 
-    match get_user_role(token.user_id).await {
-        Ok(role) => req.extensions_mut().insert(role),
-        Err(_) => return Err(ApiError::GeneralServerError.into()),
+    let auth_context = auth::AuthContext {
+        user_id: token.user_id,
+        role: get_user_role(token.user_id).await?,
     };
+
+    req.extensions_mut().insert(auth_context);
 
     let res = next.call(req).await?;
     Ok(res)
 }
 
 // dummy until implemented
-fn token_is_valid(_token: &str) -> bool {
+fn token_is_valid(token: &str) -> bool {
     true
 }

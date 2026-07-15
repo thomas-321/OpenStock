@@ -1,12 +1,21 @@
+use std::sync::Arc;
+
+use crate::util::ApiClient;
 use crate::Context;
 use crate::{Message, WindowMessage};
 use iced::Task;
+use uuid::timestamp::context;
 
 pub trait Window {
-    fn update(&mut self, message: WindowMessage, app: Context) -> Task<Message>;
-    //) -> (Option<Box<dyn Window>>, Task<WindowMessage>);
-    fn view(&self, tab_id: TabId) -> iced::Element<'_, Message>;
+    fn update(
+        &mut self,
+        message: WindowMessage,
+        tab_id: TabId,
+        app: Arc<ApiClient>,
+    ) -> Task<Message>;
+    fn view(&self, tab_id: TabId, context: &Context) -> iced::Element<'_, Message>;
     fn get_title(&self) -> &str;
+    fn get_sidebar(&self, context: &Context) -> Option<iced::Element<'_, Message>>;
 }
 
 #[derive(Default)]
@@ -31,13 +40,13 @@ impl IdGenerator {
 }
 
 /// TabId indicates the id of one window tab
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TabId {
     pub id: u32,
 }
 
 /// PaneId indicates which pane a window is a part of
-#[derive(PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PaneId {
     pub id: u32,
 }
@@ -51,12 +60,12 @@ pub struct Tab {
 }
 
 impl Tab {
-    pub fn new<T: Window + 'static>(pane_id: PaneId, tab_id: TabId, window: T) -> Self {
+    pub fn new(pane_id: PaneId, tab_id: TabId, window: Box<dyn Window>) -> Self {
         Self {
             pane_id,
             tab_id,
             tab_title: window.get_title().to_string(),
-            window: Box::new(window),
+            window,
         }
     }
 }
@@ -64,4 +73,13 @@ impl Tab {
 pub struct Pane {
     pub pane_id: PaneId,
     pub active_tab_id: Option<TabId>,
+}
+
+impl Pane {
+    pub fn is_tab_in_foreground(&self, tab_id: TabId) -> bool {
+        match self.active_tab_id {
+            Some(id) => id == tab_id,
+            None => false,
+        }
+    }
 }

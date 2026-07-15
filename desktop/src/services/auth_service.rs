@@ -1,9 +1,13 @@
-use crate::error::AppError;
-use crate::state::ApiClient;
+use reqwest::StatusCode;
+use std::sync::Arc;
+
 use models::auth::{LoginPayload, LoginResponse};
 
+use crate::error::AppError;
+use crate::util::ApiClient;
+
 pub async fn login(
-    api: ApiClient,
+    api: Arc<ApiClient>,
     email: Option<String>,
     password: Option<String>,
 ) -> Result<LoginResponse, AppError> {
@@ -13,16 +17,37 @@ pub async fn login(
     let result = api
         .auth_request(
             api.client
-                .post(format!("{}/projects", api.base_url))
+                .post(format!("{}/auth/login", api.base_url))
                 .json(&LoginPayload { email, password }),
         )
         .send()
         .await;
 
-    let result = result.unwrap_or(Err(AppError::ApiClientError)?);
+    match result {
+        Ok(value) => {
+            if value.status() != StatusCode::OK {
+                Err(AppError::InvalidLogin)?;
+            }
 
-    result
-        .json::<LoginResponse>()
-        .await
-        .or(Err(AppError::JsonParseError))
+            value
+                .json::<LoginResponse>()
+                .await
+                .or(Err(AppError::JsonParseError))
+        }
+        Err(e) => {
+            println!("{}", e);
+            Err(AppError::ApiClientError)?
+        }
+    }
+
+    //let result = result.unwrap_or(Err(AppError::ApiClientError)?);
+    //
+    //if result.status() != StatusCode::OK {
+    //    Err(AppError::InvalidLogin)?;
+    //}
+    //
+    //result
+    //    .json::<LoginResponse>()
+    //    .await
+    //    .or(Err(AppError::JsonParseError))
 }
