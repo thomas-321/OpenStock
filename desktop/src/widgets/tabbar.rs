@@ -2,7 +2,10 @@ use iced::widget::{button, row, text};
 
 use crate::{windows::window::TabId, Message};
 
-pub fn create_tabbar(pane: Vec<(TabId, String)>) -> iced::Element<'static, Message> {
+pub fn create_tabbar(
+    activetab: TabId,
+    pane: Vec<(TabId, String)>,
+) -> iced::Element<'static, Message> {
     let mut tabbar = row![];
     println!("tabbar test input: {:?}", pane);
 
@@ -17,7 +20,12 @@ pub fn create_tabbar(pane: Vec<(TabId, String)>) -> iced::Element<'static, Messa
                 .on_press(Message::GlobalStateMessage(
                     TabId { id: u32::MAX },
                     crate::StateMessage::FocusTab(tab_id),
-                )),
+                ))
+                .style(if tab_id == activetab {
+                    button::primary
+                } else {
+                    button::secondary
+                }),
         )
     }
     tabbar.into()

@@ -149,7 +149,7 @@ impl Window for LoginWindow {
     }
 
     fn get_title(&self) -> &str {
-        "Login page"
+        "Login"
     }
 }
 

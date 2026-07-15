@@ -10,7 +10,7 @@ use crate::services::user_service;
 use crate::util::ApiClient;
 use crate::widgets::tabbar::create_tabbar;
 use crate::windows::home::{HomeWindow, HomeWindowMessage};
-use crate::windows::login::LoginWindowMessage;
+use crate::windows::login::{LoginWindow, LoginWindowMessage};
 use crate::windows::window::{IdGenerator, Pane, PaneId, Tab, TabId};
 
 mod error;
@@ -45,6 +45,7 @@ enum StateMessage {
 #[derive(Clone)]
 enum CreateTab {
     HomeWindow,
+    Login,
 }
 
 #[derive(Clone)]
@@ -93,29 +94,57 @@ impl Openstock {
 
     fn view(&self) -> Element<'_, Message> {
         let context: &Context = self.context.as_ref();
-        match self.tabs.first() {
-            Some(tab) => {
-                let window = &tab.window;
-                let sidebar = tab.window.get_sidebar(context);
-                let tabbar: iced::Element<'_, Message> = create_tabbar(
-                    self.get_tab_ids_and_names_of_pane(
-                        self.panes
-                            .first()
-                            .expect("There should be at least one pane.")
-                            .pane_id
-                            .clone(),
-                    ),
-                );
 
-                let mut view = iced::widget::row![];
-                if let Some(s) = sidebar {
-                    view = view.push(s);
-                }
-                view = view.push(column![tabbar, window.view(tab.tab_id, context)]);
-                Element::from(view).explain(color!(0x0000ff))
-            }
-            None => center(container(text("Error loading page"))).into(),
+        let focused_tab_id = self.panes.first().expect("").active_tab_id.expect("");
+        let active_tab = self
+            .tabs
+            .iter()
+            .find(|tab| tab.tab_id == focused_tab_id)
+            .expect("");
+
+        let sidebar = active_tab.window.get_sidebar(context);
+        let tabbar: iced::Element<'_, Message> = create_tabbar(
+            focused_tab_id,
+            self.get_tab_ids_and_names_of_pane(
+                self.panes
+                    .first()
+                    .expect("There should be at least one pane.")
+                    .pane_id
+                    .clone(),
+            ),
+        );
+
+        let mut view = iced::widget::row![];
+
+        if let Some(s) = sidebar {
+            view = view.push(s);
         }
+
+        if active_tab.tab_title == "Login".to_string() {
+            view = view.push(column![self.create_content_window(context)]);
+        } else {
+            view = view.push(column![tabbar, self.create_content_window(context)]);
+        }
+        Element::from(view).explain(color!(0x0000ff))
+    }
+
+    /// for now only with one pane
+    fn create_content_window(&self, context: &Context) -> iced::Element<'_, Message> {
+        let active_tab_first_pane = self
+            .panes
+            .first()
+            .expect("there should be a pane")
+            .active_tab_id
+            .expect("there should be an active tab");
+
+        let tab = self
+            .tabs
+            .iter()
+            .find(|tab| tab.tab_id == active_tab_first_pane)
+            .expect("asaa");
+
+        tab.window.view(tab.tab_id, context)
+        //todo!()
     }
 
     fn theme(&self) -> Option<Theme> {
@@ -141,7 +170,11 @@ impl Openstock {
         }
     }
 
-    fn handle_state_message(&mut self, tab_id: TabId, message: StateMessage) -> Task<Message> {
+    fn handle_state_message(
+        &mut self,
+        source_tab_id: TabId,
+        message: StateMessage,
+    ) -> Task<Message> {
         match message {
             StateMessage::LoginFinshed(result) => {
                 match result {
@@ -151,7 +184,7 @@ impl Openstock {
                     Err(e) => {
                         println!("Error: {}", e);
                         return Task::done(Message::Tab(
-                            tab_id,
+                            source_tab_id,
                             WindowMessage::Login(LoginWindowMessage::LoginFailed(e)),
                         ));
                     }
@@ -171,7 +204,10 @@ impl Openstock {
                         Ok((user, role))
                     },
                     move |result| {
-                        Message::GlobalStateMessage(tab_id, StateMessage::InitFinished(result))
+                        Message::GlobalStateMessage(
+                            source_tab_id,
+                            StateMessage::InitFinished(result),
+                        )
                     },
                 )
             }
@@ -181,12 +217,13 @@ impl Openstock {
                     context.user = Some(user);
                     context.role = Some(role);
                     self.context = Arc::new(context);
-                    self.create_tab(CreateTab::HomeWindow, &tab_id);
-                    self.remove_tab(tab_id);
+                    let new_tab = self.create_tab(CreateTab::HomeWindow, &source_tab_id);
+                    self.set_active_tab(&new_tab);
+                    self.remove_tab(source_tab_id);
                     Task::none()
                 }
                 Err(e) => Task::done(Message::Tab(
-                    tab_id,
+                    source_tab_id,
                     WindowMessage::Login(LoginWindowMessage::LoginFailed(e)),
                 )),
             },
@@ -202,22 +239,40 @@ impl Openstock {
                 self.remove_tab(tab_id);
                 Task::none()
             }
-            StateMessage::FocusTab(tab_id) => Task::none(),
+            StateMessage::FocusTab(tab_id) => {
+                self.set_active_tab(&tab_id);
+                Task::none()
+            }
         }
     }
 
     /// Create a new tab and returns its TabId
     fn create_tab(&mut self, tab_type: CreateTab, source_tab_id: &TabId) -> TabId {
         let pane_id = self.get_pane_id_from_tab_id(source_tab_id);
-        let new_tab_id = self.id_generator.get_new_tab_id();
+        self.create_tab_in_pane(tab_type, &pane_id)
+    }
 
+    /// Create a new tab in the given pane
+    fn create_tab_in_pane(&mut self, tab_type: CreateTab, pane_id: &PaneId) -> TabId {
+        let new_tab_id = self.id_generator.get_new_tab_id();
         self.tabs.push(Tab::new(
             pane_id.clone(),
             new_tab_id,
             match tab_type {
-                CreateTab::HomeWindow => HomeWindow {},
+                CreateTab::HomeWindow => Box::new(HomeWindow {}),
+                CreateTab::Login => Box::new(LoginWindow::default()),
             },
         ));
+
+        if let Some(pane) = self
+            .panes
+            .iter_mut()
+            .find(|pane| pane.pane_id == *pane_id && pane.active_tab_id.is_none())
+        {
+            pane.active_tab_id = Some(new_tab_id);
+        } else {
+            println!("There should exists a pane");
+        }
         new_tab_id
     }
 
@@ -281,25 +336,10 @@ impl Openstock {
 
 impl Default for Openstock {
     fn default() -> Self {
-        let mut id_generator = IdGenerator::default();
-
-        let mut pane = windows::window::Pane {
-            pane_id: id_generator.get_new_pane_id(),
-            active_tab_id: None,
-        };
-        let default_window = windows::LoginWindow::default();
-        let tab = windows::window::Tab::new(
-            pane.pane_id.clone(),
-            id_generator.get_new_tab_id(),
-            default_window,
-        );
-
-        pane.active_tab_id = Some(tab.tab_id);
-
-        Self {
+        let mut os = Self {
+            panes: vec![],
+            tabs: vec![],
             id_generator: IdGenerator::default(),
-            panes: vec![pane],
-            tabs: vec![tab],
             context: Context {
                 user: None,
                 role: None,
@@ -307,6 +347,10 @@ impl Default for Openstock {
                 theme: Theme::Dark,
             }
             .into(),
-        }
+        };
+
+        let pane_id = os.create_pane();
+        os.create_tab_in_pane(CreateTab::Login, &pane_id);
+        os
     }
 }

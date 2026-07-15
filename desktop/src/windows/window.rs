@@ -60,12 +60,12 @@ pub struct Tab {
 }
 
 impl Tab {
-    pub fn new<T: Window + 'static>(pane_id: PaneId, tab_id: TabId, window: T) -> Self {
+    pub fn new(pane_id: PaneId, tab_id: TabId, window: Box<dyn Window>) -> Self {
         Self {
             pane_id,
             tab_id,
             tab_title: window.get_title().to_string(),
-            window: Box::new(window),
+            window,
         }
     }
 }
